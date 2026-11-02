@@ -283,9 +283,14 @@ impl Engine {
         if self.iso { self.scene.settings.iso_source_height } else if self.cnossos { CNOSSOS_HS } else { SOURCE_HEIGHTS[1] }
     }
 
-    fn occluded(&self, a: V3, b: V3, skip: &[usize]) -> bool {
+    /// Does the leg a→b pass through the body of one of the reflecting
+    /// barriers `own`? Other barriers on a reflected path are not a reason to
+    /// drop it: the legs diffract over them in `add_reflected` (the
+    /// reflection off a wall across the road still reaches the houses behind
+    /// a wall on this side, over its top).
+    fn occluded(&self, a: V3, b: V3, skip: &[usize], own: &[Option<usize>]) -> bool {
         for &fi in &self.scene.barrier_facets {
-            if skip.contains(&fi) {
+            if skip.contains(&fi) || !own.contains(&self.barrier_of(fi)) {
                 continue;
             }
             if self.scene.facets[fi].intersect(a, b).is_some() {
@@ -501,7 +506,8 @@ impl Engine {
             if !f.contains(p) {
                 continue;
             }
-            if self.occluded(src, p, &[fi]) || self.occluded(p, r3, &[fi]) {
+            let own = [self.barrier_of(fi)];
+            if own[0].is_some() && (self.occluded(src, p, &[fi], &own) || self.occluded(p, r3, &[fi], &own)) {
                 continue;
             }
             // leave the face by half a metre so the legs do not start inside it
@@ -558,7 +564,15 @@ impl Engine {
                 continue;
             }
             let skip = [f1i, f2i];
-            if self.occluded(src, p1, &skip) || self.occluded(p1, p2, &skip) || self.occluded(p2, r3, &skip) {
+            // each leg is checked only against the bodies of the barriers it
+            // leaves or reaches by reflection; the last leg may diffract over
+            // the first reflector (canyon between two walls)
+            let (o1, o2) = ([self.barrier_of(f1i)], [self.barrier_of(f2i)]);
+            let both = [o1[0], o2[0]];
+            if (o1[0].is_some() && self.occluded(src, p1, &skip, &o1))
+                || (both.iter().any(|o| o.is_some()) && self.occluded(p1, p2, &skip, &both))
+                || (o2[0].is_some() && self.occluded(p2, r3, &skip, &o2))
+            {
                 continue;
             }
             let r1 = self.iso_refl(f1i, src, p1, p2, f1.refl);
