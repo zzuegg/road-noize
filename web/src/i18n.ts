@@ -253,6 +253,13 @@ const de = {
   'sources.selectNone': 'keine',
   'sources.selectMain': 'Hauptstraßen',
   'sources.hint': 'Zeigt den Anteil einzelner Straßen am Lärm – z. B. nur die SS 38. Grenzwerte gelten je Straße (DPR 142/2004), Lden für alle zusammen.',
+  'points.run': 'Nur Punkte rechnen',
+  'points.auto': 'automatisch bei jeder Änderung',
+  'points.none': 'Mit „Punkt setzen“ Hörpunkte an Fenstern setzen – dann rechnet nur dort (Sekundenbruchteile).',
+  'points.sweep': 'Wandhöhe 1–6 m testen',
+  'points.sweepHint': 'alle Wände des Szenarios, nur an den Punkten',
+  'points.sweepDelta': 'Δ zum Vergleichsszenario je Wandhöhe (negativ = leiser).',
+  'points.sweepAbs': 'Pegel je Wandhöhe; mit Vergleichsszenario als Δ.',
 } as const
 
 export type Key = keyof typeof de
@@ -511,6 +518,13 @@ const en: Dict = {
   'sources.selectNone': 'none',
   'sources.selectMain': 'main roads',
   'sources.hint': 'Shows the share of individual roads in the noise – e.g. the SS 38 alone. Limits apply per road (DPR 142/2004), Lden to all together.',
+  'points.run': 'Points only',
+  'points.auto': 'automatically on every change',
+  'points.none': 'Place listening points at windows with "Place point" – then only those are computed (fractions of a second).',
+  'points.sweep': 'Test wall height 1–6 m',
+  'points.sweepHint': 'all walls of the scenario, points only',
+  'points.sweepDelta': 'Δ to the comparison scenario per wall height (negative = quieter).',
+  'points.sweepAbs': 'Level per wall height; as Δ with a comparison scenario.',
 }
 
 export type Lang = 'de' | 'en'

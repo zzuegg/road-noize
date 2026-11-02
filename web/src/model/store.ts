@@ -93,6 +93,22 @@ export type PeWeather = keyof typeof PE_WEATHER
 
 export const PE_FREQS = [63, 125, 250, 500, 1000, 2000]
 
+export interface PointResult {
+  hash: string
+  ids: string[]
+  /** 8 values per receiver: Ld, Le, Ln, Lmax light, medium, heavy, moped, moto */
+  data: Float32Array
+  ms: number
+}
+
+export interface Sweep {
+  scenarioId: string
+  heights: number[]
+  ids: string[]
+  /** per height, 8 values per receiver */
+  data: Float32Array[]
+}
+
 export interface Terrain {
   key: string
   dtm: Raster
@@ -158,6 +174,17 @@ interface State {
   cancel: () => void
   computeSection: (a: XY, b: XY) => Promise<void>
   computePe: (weather: PeWeather) => Promise<void>
+
+  /** Receiver points only, per scenario: fast preliminary comparison. */
+  pointResults: Record<string, PointResult>
+  pointsBusy: boolean
+  /** recompute the points automatically after every change */
+  autoPoints: boolean
+  setAutoPoints: (on: boolean) => void
+  computePoints: () => Promise<void>
+  /** the active scenario's walls at several heights, points only */
+  sweep?: Sweep
+  runSweep: (heights: number[]) => Promise<void>
   closeSection: () => void
 }
 
@@ -571,6 +598,79 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
+    pointResults: {},
+    pointsBusy: false,
+    autoPoints: false,
+    setAutoPoints: (on) => {
+      set({ autoPoints: on })
+      if (on) void get().computePoints()
+    },
+
+    computePoints: async () => {
+      const p = get().project
+      const terrain = get().terrain
+      // a full calculation owns the workers; do not interrupt it
+      if (!p.area || !terrain || p.receivers.length === 0 || get().progress !== undefined) return
+      const rec: ReceiverSet = {
+        x: Float64Array.from(p.receivers.map((r) => r.x)),
+        y: Float64Array.from(p.receivers.map((r) => r.y)),
+        h: Float64Array.from(p.receivers.map((r) => r.height)),
+        skip: new Uint8Array(p.receivers.length),
+      }
+      const todo = p.scenarios.filter((s) => get().pointResults[s.id]?.hash !== inputHash(p, s))
+      if (todo.length === 0) return
+      set({ pointsBusy: true })
+      try {
+        const t0 = performance.now()
+        const out = await runParts(
+          todo.map((s) => ({ key: inputHash(p, s), json: sceneJson(p, s, terrain.dtm), ground: terrain.dtm.data, set: rec, lmax: true })),
+          () => {},
+        )
+        const ms = (performance.now() - t0) / todo.length
+        const pointResults = { ...get().pointResults }
+        todo.forEach((s, i) => (pointResults[s.id] = { hash: inputHash(p, s), ids: p.receivers.map((r) => r.id), data: out[i], ms }))
+        set({ pointResults })
+      } catch (e) {
+        if (!(e instanceof Cancelled)) set({ error: errText(e) })
+      } finally {
+        set({ pointsBusy: false })
+        // the document may have changed while this ran
+        if (get().autoPoints) scheduleAutoPoints()
+      }
+    },
+
+    runSweep: async (heights) => {
+      const p = get().project
+      const terrain = get().terrain
+      if (!p.area || !terrain || p.receivers.length === 0 || get().progress !== undefined) return
+      const sc = activeScenario(p)
+      if (sc.barriers.length === 0) return
+      const rec: ReceiverSet = {
+        x: Float64Array.from(p.receivers.map((r) => r.x)),
+        y: Float64Array.from(p.receivers.map((r) => r.y)),
+        h: Float64Array.from(p.receivers.map((r) => r.height)),
+        skip: new Uint8Array(p.receivers.length),
+      }
+      set({ pointsBusy: true })
+      try {
+        const parts = heights.map((h) => {
+          const variant: Scenario = {
+            ...sc,
+            barriers: sc.barriers.map((b) =>
+              b.preset.kind === 'custom' ? b : { ...b, preset: { ...b.preset, height: h }, profile: presetProfile({ ...b.preset, height: h }) },
+            ),
+          }
+          return { key: `sweep|${h}|${inputHash(p, variant)}`, json: sceneJson(p, variant, terrain.dtm), ground: terrain.dtm.data, set: rec, lmax: true }
+        })
+        const data = await runParts(parts, () => {})
+        set({ sweep: { scenarioId: sc.id, heights, ids: p.receivers.map((r) => r.id), data } })
+      } catch (e) {
+        if (!(e instanceof Cancelled)) set({ error: errText(e) })
+      } finally {
+        set({ pointsBusy: false })
+      }
+    },
+
     computePe: async (weather) => {
       const p = get().project
       const terrain = get().terrain
@@ -598,6 +698,22 @@ export const useStore = create<State>((set, get) => {
     },
     closeSection: () => set({ section: undefined }),
   }
+})
+
+// ------------------------------------------------ automatic point updates
+
+let autoTimer: ReturnType<typeof setTimeout> | undefined
+
+function scheduleAutoPoints(): void {
+  clearTimeout(autoTimer)
+  autoTimer = setTimeout(() => {
+    const st = useStore.getState()
+    if (st.autoPoints && !st.pointsBusy) void st.computePoints()
+  }, 500)
+}
+
+useStore.subscribe((state, prev) => {
+  if (state.autoPoints && (state.project !== prev.project || state.terrain !== prev.terrain)) scheduleAutoPoints()
 })
 
 /** Restores the last session's project. */

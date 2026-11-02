@@ -672,6 +672,7 @@ export function ResultsPanel() {
 
   return (
     <Section title={t('section.results')}>
+      <PointsQuick />
       <SourcePicker />
       <div className="row wrap">
         {progress === undefined ? (
@@ -772,6 +773,104 @@ export function ResultsPanel() {
       )}
       {rc && <p className="muted small">{t('results.compareHint')}</p>}
     </Section>
+  )
+}
+
+/** Points-only calculation: fast comparison of scenarios at chosen windows. */
+function PointsQuick() {
+  const project = useStore((s) => s.project)
+  const pr = useStore((s) => s.pointResults)
+  const busy = useStore((s) => s.pointsBusy)
+  const auto = useStore((s) => s.autoPoints)
+  const sweep = useStore((s) => s.sweep)
+  const metric = useStore((s) => s.metric)
+  const terrain = useStore((s) => s.terrain)
+  const st = useStore.getState
+  const sc = activeScenario(project)
+  const cmp = project.compareScenarioId
+  const val = (sid: string, i: number) => {
+    const r = pr[sid]
+    if (!r || r.hash !== inputHash(project, project.scenarios.find((s) => s.id === sid)!)) return NaN
+    const j = r.ids.indexOf(project.receivers[i].id)
+    return j < 0 ? NaN : metricArray(r.data, 8, metric)[j]
+  }
+  const ms = pr[sc.id]?.ms
+  return (
+    <div className="editor">
+      <div className="row wrap">
+        <button className="primary" disabled={!terrain || project.receivers.length === 0 || busy} onClick={() => void st().computePoints()}>
+          {t('points.run')}
+        </button>
+        <label className="check">
+          <input type="checkbox" checked={auto} onChange={(e) => st().setAutoPoints(e.target.checked)} />
+          {t('points.auto')}
+        </label>
+        {busy && <span className="muted small">…</span>}
+        {ms !== undefined && !busy && <span className="muted small">{fmt(ms / 1000, 2)} s</span>}
+      </div>
+      {project.receivers.length === 0 && <p className="muted small">{t('points.none')}</p>}
+      {project.receivers.length > 0 && (
+        <div className="scroll-x">
+          <table className="stats">
+            <thead>
+              <tr>
+                <th>{t('results.receiver')}</th>
+                {project.scenarios.map((s) => (
+                  <th key={s.id} className={s.id === sc.id ? 'active-col' : ''} title={s.name}>{s.name.slice(0, 14)}</th>
+                ))}
+                {cmp && <th>{t('results.delta')}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {project.receivers.map((r, i) => (
+                <tr key={r.id}>
+                  <td>{r.name} <span className="muted">{fmt(r.height, 0)} m</span></td>
+                  {project.scenarios.map((s) => (
+                    <td key={s.id} className={s.id === sc.id ? 'active-col' : ''}>{fmt(val(s.id, i), 1)}</td>
+                  ))}
+                  {cmp && <td>{delta(val(sc.id, i), val(cmp, i))}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="row wrap">
+        <button disabled={!terrain || project.receivers.length === 0 || busy || sc.barriers.length === 0} onClick={() => void st().runSweep([1, 2, 3, 4, 5, 6])}>
+          {t('points.sweep')}
+        </button>
+        <span className="muted small">{t('points.sweepHint')}</span>
+      </div>
+      {sweep && sweep.scenarioId === sc.id && (
+        <div className="scroll-x">
+          <table className="stats">
+            <thead>
+              <tr>
+                <th>{t('results.receiver')}</th>
+                {sweep.heights.map((h) => <th key={h}>{h} m</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {project.receivers.map((r, i) => {
+                const j = sweep.ids.indexOf(r.id)
+                if (j < 0) return null
+                const ref = cmp ? val(cmp, i) : NaN
+                return (
+                  <tr key={r.id}>
+                    <td>{r.name}</td>
+                    {sweep.data.map((d, k) => {
+                      const v = metricArray(d, 8, metric)[j]
+                      return <td key={k}>{Number.isFinite(ref) ? delta(v, ref) : fmt(v, 1)}</td>
+                    })}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <p className="muted small">{cmp ? t('points.sweepDelta') : t('points.sweepAbs')}</p>
+        </div>
+      )}
+    </div>
   )
 }
 
