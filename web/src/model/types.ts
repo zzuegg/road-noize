@@ -216,11 +216,20 @@ export const GROUND_CLASSES: readonly GroundClass[] = [
   'asphalt',
 ]
 
-export type Method = 'physics' | 'iso9613'
+export type Method = 'physics' | 'cnossos' | 'iso9613'
+
+/** Which roads emit in a calculation. */
+export type SourceSelection = 'all' | 'main' | 'selected'
 
 export interface Settings {
-  /** physics: detailed model; iso9613: ISO 9613-2:1996 standards mode */
+  /** physics: detailed model; cnossos: CNOSSOS-EU; iso9613: ISO 9613-2:1996 */
   method: Method
+  /** CNOSSOS-EU probability of favourable conditions (day, evening, night) */
+  favourableP: [number, number, number]
+  /** roads that emit: all, main roads only (state + provincial), or a selection */
+  sources: SourceSelection
+  /** road ids for sources = 'selected' */
+  selectedRoads: string[]
   /** ISO 9613-2 C0 per period (day, evening, night), dB; 0 = downwind */
   cmetC0: [number, number, number]
   /** source height above the road in ISO mode, m */

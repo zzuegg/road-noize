@@ -61,6 +61,9 @@ export const TURBULENCE_PRESETS: Record<'weak' | 'moderate' | 'strong', Turbulen
 
 export const DEFAULT_SETTINGS: Settings = {
   method: 'physics',
+  favourableP: [0.5, 0.75, 1],
+  sources: 'all',
+  selectedRoads: [],
   cmetC0: [0, 0, 0],
   isoSourceHeight: 0.05,
   gridSpacing: 10,

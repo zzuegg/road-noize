@@ -22,6 +22,7 @@ import { activeScenario, useStore } from '../model/store'
 import { buildingLevels, metricArray } from './derived'
 import { diffColour, levelColour, rgb } from './palette'
 import { fmt, t } from '../i18n'
+import { roadEmits } from '../acoustics/core'
 import type { XY } from '../model/types'
 
 const LEVELS = 18
@@ -255,9 +256,9 @@ export function MapView() {
       const selected = selection?.kind === 'road' && selection.id === r.id
       const style = new Style({
         stroke: new Stroke({
-          color: !r.enabled || m?.closed ? 'rgba(120,120,120,0.6)' : selected ? '#00e5ff' : m ? '#ff9f1c' : 'rgba(30,30,30,0.85)',
+          color: !roadEmits(r, project.settings) || m?.closed ? 'rgba(120,120,120,0.6)' : selected ? '#00e5ff' : m ? '#ff9f1c' : 'rgba(30,30,30,0.85)',
           width: ROAD_WIDTH[r.cls] ?? 3,
-          lineDash: r.enabled ? undefined : [6, 6],
+          lineDash: roadEmits(r, project.settings) ? undefined : [6, 6],
         }),
       })
       r.lines.forEach((l, i) => {
@@ -269,7 +270,7 @@ export function MapView() {
         s.addFeature(f)
       })
     }
-  }, [project.roads, scenario.measures, selection, ready])
+  }, [project.roads, project.settings, scenario.measures, selection, ready])
 
   useEffect(() => {
     const s = vec.current.barriers

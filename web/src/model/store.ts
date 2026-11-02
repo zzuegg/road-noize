@@ -43,7 +43,7 @@ import {
 } from '../acoustics/build'
 import { Cancelled, cancelAll, runParts, runPe, type PeOutput, type RunPart } from '../acoustics/runner'
 import { sampleBilinear, sampleNearest } from '../acoustics/raster'
-import { presetProfile, sceneJson } from '../acoustics/core'
+import { presetProfile, roadEmits, sceneJson } from '../acoustics/core'
 import { t } from '../i18n'
 
 const db = createStore('traffic-sansim', 'kv')
@@ -485,7 +485,7 @@ export const useStore = create<State>((set, get) => {
       const p = get().project
       const terrain = get().terrain
       if (!p.area || !terrain) return set({ error: t('run.needTerrain') })
-      if (!p.roads.some((r) => r.enabled && r.traffic.aadt > 0)) {
+      if (!p.roads.some((r) => roadEmits(r, p.settings) && r.traffic.aadt > 0)) {
         return set({ error: t('run.needRoads') })
       }
       const bldg = buildingRaster(p)!

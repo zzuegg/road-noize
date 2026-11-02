@@ -32,28 +32,36 @@ South Tyrol (CC0), EPSG:25832:
 
 Traffic volumes start as **placeholders** — enter counted AADT, shares and speeds.
 
-## Two calculation methods
+## Three calculation methods
 
-| | **Physical (detailed)** | **ISO 9613-2 (standards)** |
-|---|---|---|
-| Purpose | realistic comparison and explanation of options | formal assessments, reproducible by other software |
-| Sound over terrain, buildings, walls | complex Fresnel diffraction over the convex hull, ground images on both sides, phase kept | D_z = 10 lg(3 + 20/λ · C3 · z · K_met), multiple diffraction C3, caps 20/25 dB, A_bar = D_z − A_gr |
-| Around wall ends | Fresnel knife-edge on the end edge | ISO lateral path, K_met = 1 |
-| Ground | impedance + ground wave, Fresnel-zone weighted | general method, regions G_s/G_m/G_r from the ground map |
-| Reflections | image sources ≤ 2nd order on every face incl. tilted, energy absorption per band | image sources with ρ = 1 − α and the ISO size criterion |
-| Weather | curved-ray classes weighted by occurrence | downwind (C0 = 0) or long-term with C0 per period |
-| Turbulence | coherence loss + shadow scattering | not part of the standard |
-| Sections | rays + parabolic-equation wave solver | — |
+| | **Physical (detailed)** | **CNOSSOS-EU** | **ISO 9613-2** |
+|---|---|---|---|
+| Purpose | realistic comparison and explanation | strategic noise maps (END, D.Lgs. 194/2005, 42/2017) | project assessments (e.g. DPR 142/2004) |
+| Sound over obstacles | complex Fresnel diffraction over the convex hull, ground images both sides, phase kept | Δ_dif = 10 lg(3 + 40/λ C″ δ), ground on both sides via Δ_ground(S,O), Δ_ground(O,R), curved paths (Γ = max(1000, 8d)) under F | D_z = 10 lg(3 + 20/λ C3 z K_met), A_bar = D_z − A_gr, caps 20/25 dB |
+| Around wall ends | Fresnel knife-edge | not part of the method | ISO lateral path |
+| Ground | impedance + ground wave, Fresnel zone | G_path / G'_path, C_f, w(f, G) (eq. 2.5.15/16), heights above the mean plane | general method, regions G_s/G_m/G_r |
+| Reflections | image sources ≤ 2nd order on every face incl. tilted | image sources, L_W + 10 lg(1 − α) | image sources, ρ = 1 − α, size criterion |
+| Weather | curved-ray classes by occurrence | homogeneous + favourable, p per period (default 0.5 / 0.75 / 1.0) | downwind, or C_met with C0 |
+| Turbulence | coherence loss + shadow scattering | only via δz_T in F | — |
 
-The chosen method is written on every result and into the CSV export.
+Emission is CNOSSOS-EU in all three (CNOSSOS and ISO: source at 0.05 m;
+physical: Harmonoise heights). The method is written on every result and into
+the CSV export.
 
-**Legal note.** ISO 9613-2 is the method generally accepted for project
-assessments (e.g. under DPR 142/2004). **Strategic noise maps** under the
-END (Directive 2002/49/EC, D.Lgs. 194/2005 and 42/2017) must use
-**CNOSSOS-EU**, whose propagation is NMPB-2008-based and *not* ISO 9613-2;
-the emission here is already CNOSSOS-EU, the CNOSSOS propagation is not yet
-implemented. Implemented edition: ISO 9613-2:1996 (the 2024 revision is not
-yet implemented). Have a formal report checked against certified software.
+Cross-check (`cargo run --release --example compare`: line source, 1000 cars/h
+at 50 km/h, receiver 4 m): over **hard ground** the three agree within ~1.5 dB
+from 10 to 400 m. Over **meadow** they diverge with distance in the known way —
+ISO 9613-2 has the mildest ground effect (highest far levels), CNOSSOS
+homogeneous the strongest, CNOSSOS favourable close to ISO, the physical model
+in between. Which method a report uses therefore matters, and the tool shows it.
+
+**Legal note.** Strategic noise maps must use CNOSSOS-EU; project assessments
+commonly use ISO 9613-2. Implemented: CNOSSOS-EU as in Directive (EU)
+2015/996 with the 2021/1226 amendments as far as reflected here, ISO 9613-2:1996
+(the 2024 revision is not implemented). This is not certified software: have a
+formal report checked against certified software (e.g. CadnaA, SoundPLAN,
+IMMI) on the same input — the CNOSSOS-EU reference test cases would be the
+next step for a formal verification.
 
 ## The model (physical method)
 
@@ -131,6 +139,8 @@ adjustable.
   removes that, absorptive panels too; a bent top screens more than a plain
   wall of the same height; every preset screens.
 - Downward refraction reduces a wall's insertion loss at 200 m.
+- CNOSSOS: line source, porous vs hard ground, favourable > homogeneous far
+  away, wall insertion loss bounded, reflective wall raises the opposite side.
 - ISO: D_z at z = 0 is 4.8 dB, caps 20/25 dB; size criterion; two distance
   doublings of a line source; porous vs hard ground; wall insertion loss
   bounded; reflective wall raises the opposite side; C_met ≤ C0.

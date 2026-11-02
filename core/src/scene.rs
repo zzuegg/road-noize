@@ -134,6 +134,9 @@ pub struct Settings {
     /// ISO 9613-2 C0 per period (day, evening, night), dB; 0 = downwind
     #[serde(default)]
     pub cmet_c0: [f64; NP],
+    /// CNOSSOS-EU: probability of favourable conditions per period
+    #[serde(default = "pfav")]
+    pub favourable_p: [f64; NP],
     /// source height above the road in ISO mode, m
     #[serde(default = "iso_hs")]
     pub iso_source_height: f64,
@@ -146,6 +149,7 @@ pub struct Settings {
 fn temp() -> f64 { 10.0 }
 fn physics() -> String { "physics".into() }
 fn iso_hs() -> f64 { 0.05 }
+fn pfav() -> [f64; NP] { [0.5, 0.75, 1.0] }
 fn hum() -> f64 { 70.0 }
 
 impl Default for Settings {
@@ -162,6 +166,7 @@ impl Default for Settings {
             method: physics(),
             cmet_c0: [0.0; NP],
             iso_source_height: iso_hs(),
+            favourable_p: pfav(),
             temperature: 10.0,
             humidity: 70.0,
         }

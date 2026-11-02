@@ -6,6 +6,8 @@ import { buildingLevels, metricArray, stats } from './derived'
 import { floorHeights } from '../acoustics/build'
 import { GROUND_CLASSES, type GroundClass, type Project, type Road, type RoadMeasure, type Traffic } from '../model/types'
 import { BarrierEditor } from './BarrierEditor'
+import { isMainRoad } from '../acoustics/core'
+import type { SourceSelection } from '../model/types'
 import { DEFAULT_MET, TURBULENCE_PRESETS } from '../model/defaults'
 
 function Section({ title, children, open = true }: { title: string; children: ReactNode; open?: boolean }) {
@@ -514,17 +516,26 @@ export function SettingsPanel() {
   const setMet = (i: number, patch: Partial<(typeof s.met)[number]>) =>
     set({ met: s.met.map((m, j) => (j === i ? { ...m, ...patch } : m)) })
   const sums = [0, 1, 2].map((k) => s.met.reduce((a, m) => a + m.weights[k], 0))
-  const iso = s.method === 'iso9613'
+  const iso = s.method === 'iso9613' || s.method === 'cnossos'
   return (
     <Section title={t('section.settings')} open={false}>
       <label className="num">
         <span>{t('settings.method')}</span>
         <select value={s.method} onChange={(e) => set({ method: e.target.value as typeof s.method })}>
           <option value="physics">{t('method.physics')}</option>
+          <option value="cnossos">{t('method.cnossos')}</option>
           <option value="iso9613">{t('method.iso9613')}</option>
         </select>
       </label>
-      <p className="muted small">{t(iso ? 'method.isoHint' : 'method.physicsHint')}</p>
+      <p className="muted small">{t(iso ? 'method.isoHint' : s.method === 'cnossos' ? 'method.cnossosHint' : 'method.physicsHint')}</p>
+      {s.method === 'cnossos' && (
+        <div className="grid3">
+          {[0, 1, 2].map((k) => (
+            <Num key={k} label={`p ${t(k === 0 ? 'period.day' : k === 1 ? 'period.evening' : 'period.night')}`} title={t('settings.pFavHint')} value={s.favourableP[k]} step={0.05} min={0} max={1}
+              onChange={(v) => set({ favourableP: s.favourableP.map((c, j) => (j === k ? v ?? 0.5 : c)) as [number, number, number] })} />
+          ))}
+        </div>
+      )}
       {iso && (
         <div className="grid3">
           {[0, 1, 2].map((k) => (
@@ -646,7 +657,7 @@ export function ResultsPanel() {
   })
 
   const csv = () => {
-    const head = [`method ${project.settings.method === 'iso9613' ? 'ISO 9613-2:1996 (CNOSSOS-EU emission)' : 'sansim physics'}`, 'x', 'y', 'height', `${metric} ${sc.name}`, cmp ? `${metric} ${cmp.name}` : '', 'Lday', 'Lnight', 'Lmax truck', 'Lmax motorcycle', 'measured day', 'measured night']
+    const head = [`method ${project.settings.method === 'iso9613' ? 'ISO 9613-2:1996 (CNOSSOS-EU emission)' : project.settings.method === 'cnossos' ? 'CNOSSOS-EU' : 'sansim physics'}; sources: ${sourcesLabel(project)}`, 'x', 'y', 'height', `${metric} ${sc.name}`, cmp ? `${metric} ${cmp.name}` : '', 'Lday', 'Lnight', 'Lmax truck', 'Lmax motorcycle', 'measured day', 'measured night']
     const lines = recRows.map((x) =>
       [x.rec.name, x.rec.x.toFixed(1), x.rec.y.toFixed(1), x.rec.height, x.v.toFixed(1), x.w?.toFixed(1) ?? '', x.ld.toFixed(1), x.ln.toFixed(1), x.lmaxTruck.toFixed(1), x.lmaxMoto.toFixed(1), x.rec.measuredDay ?? '', x.rec.measuredNight ?? ''].join(';'),
     )
@@ -661,6 +672,7 @@ export function ResultsPanel() {
 
   return (
     <Section title={t('section.results')}>
+      <SourcePicker />
       <div className="row wrap">
         {progress === undefined ? (
           <>
@@ -686,7 +698,7 @@ export function ResultsPanel() {
       {!r && <p className="muted small">{t('results.none')}</p>}
       {r && s1 && (
         <>
-          <p className="muted small">{t(`metric.${metric}` as never)} · <strong>{t(project.settings.method === 'iso9613' ? 'method.iso9613' : 'method.physics')}</strong> · {t('run.time', { s: fmt(r.seconds, 1) })}</p>
+          <p className="muted small">{t(`metric.${metric}` as never)} · <strong>{t(`method.${project.settings.method}` as never)}</strong> · {sourcesLabel(project)} · {t('run.time', { s: fmt(r.seconds, 1) })}</p>
           <table className="stats">
             <thead>
               <tr>
@@ -760,6 +772,59 @@ export function ResultsPanel() {
       )}
       {rc && <p className="muted small">{t('results.compareHint')}</p>}
     </Section>
+  )
+}
+
+/** What emits in the calculation, in words. */
+export function sourcesLabel(p: Project): string {
+  const s = p.settings
+  if (s.sources === 'main') return t('sources.mainShort')
+  if (s.sources === 'selected') {
+    const names = p.roads.filter((r) => s.selectedRoads.includes(r.id)).map((r) => r.name)
+    return names.length ? names.join(', ') : t('sources.none')
+  }
+  return t('sources.allShort')
+}
+
+function SourcePicker() {
+  const project = useStore((s) => s.project)
+  const set = useStore((s) => s.setSettings)
+  const s = project.settings
+  const toggle = (id: string, on: boolean) =>
+    set({ selectedRoads: on ? [...s.selectedRoads, id] : s.selectedRoads.filter((x) => x !== id) })
+  const mainCount = project.roads.filter(isMainRoad).length
+  return (
+    <div className="editor">
+      <label className="num">
+        <span>{t('sources.title')}</span>
+        <select value={s.sources} onChange={(e) => set({ sources: e.target.value as SourceSelection })}>
+          <option value="all">{t('sources.all')}</option>
+          <option value="main">{t('sources.main', { n: mainCount })}</option>
+          <option value="selected">{t('sources.selected')}</option>
+        </select>
+      </label>
+      {s.sources === 'selected' && (
+        <>
+          <div className="row wrap small">
+            <button onClick={() => set({ selectedRoads: project.roads.map((r) => r.id) })}>{t('sources.selectAll')}</button>
+            <button onClick={() => set({ selectedRoads: [] })}>{t('sources.selectNone')}</button>
+            <button onClick={() => set({ selectedRoads: project.roads.filter(isMainRoad).map((r) => r.id) })}>{t('sources.selectMain')}</button>
+          </div>
+          <ul className="list">
+            {project.roads.map((r) => (
+              <li key={r.id}>
+                <label className="check">
+                  <input type="checkbox" checked={s.selectedRoads.includes(r.id)} onChange={(e) => toggle(r.id, e.target.checked)} />
+                  {r.name}
+                </label>
+                <span className="muted small">{t(`class.${r.cls}` as never)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="muted small">{t('sources.hint')}</p>
+    </div>
   )
 }
 

@@ -16,6 +16,9 @@ import type { Category } from '../model/types'
 
 type Mode = 'rays' | 'pe'
 
+/** Elevation angle up to which the wide-angle (Padé 1,1) PE is trusted. */
+const PE_MAX_ANGLE = 30
+
 export function SectionView() {
   const section = useStore((s) => s.section)
   const busy = useStore((s) => s.sectionBusy)
@@ -71,7 +74,7 @@ export function SectionView() {
       }
     } else {
       const lw = vehiclePower(vehicle, speed)
-      const zsAbs = sampleBilinear(terrain.dtm, a[0], a[1]) + 0.3
+      const zsSrc = sampleBilinear(terrain.dtm, a[0], a[1]) + 0.3
       const levels = (id: string) => {
         const pe = section.pe[id]
         if (!pe) return undefined
@@ -80,7 +83,7 @@ export function SectionView() {
           const z = pe.zBottom + row * pe.outDz
           for (let col = 1; col < pe.cols; col++) {
             const r = col * pe.outDr
-            const R = Math.hypot(r, z - zsAbs)
+            const R = Math.hypot(r, z - zsSrc)
             let e = 0
             let ok = false
             PE_FREQS.forEach((f, fi) => {
@@ -101,10 +104,17 @@ export function SectionView() {
         const { pe, out } = cur
         const cw = (pe.outDr / len) * pw
         const rh = (pe.outDz / (z1 - z0)) * ph
+        const tanMax = Math.tan((PE_MAX_ANGLE * Math.PI) / 180)
         for (let row = 0; row < pe.rows; row++) {
           const z = pe.zBottom + row * pe.outDz
           if (z < z0 || z > z1) continue
           for (let col = 1; col < pe.cols; col++) {
+            // the wide-angle PE is only accurate up to ~30° elevation from the source
+            if (Math.abs(z - zsSrc) > tanMax * col * pe.outDr) {
+              ctx.fillStyle = 'rgba(120,120,120,0.25)'
+              ctx.fillRect(X(col * pe.outDr) - cw / 2, Y(z) - rh / 2, cw + 1, rh + 1)
+              continue
+            }
             let v = out[row * pe.cols + col]
             if (!Number.isFinite(v)) continue
             let colr: string | undefined

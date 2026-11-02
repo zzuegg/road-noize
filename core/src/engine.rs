@@ -4,6 +4,7 @@
 
 use crate::bands::{a_weighted, BANDS, NB};
 use crate::geometry::{Owner, V3};
+use crate::cnossos;
 use crate::iso9613;
 use crate::path::{evaluate, frequencies, leg_screening, Freq, ImpedanceTable, Profile};
 use crate::emission::SOURCE_HEIGHTS;
@@ -11,6 +12,8 @@ use crate::scene::{Scene, NH, NP};
 use crate::special::knife_edge;
 use std::f64::consts::PI;
 
+/// CNOSSOS-EU source height above the road surface.
+const CNOSSOS_HS: f64 = 0.05;
 const REFINE: f64 = 0.2;
 const REFINE_REFL: f64 = 0.3;
 /// Order-2 reflections only between faces this close to each other and the receiver.
@@ -26,6 +29,8 @@ pub struct Engine {
     tab: ImpedanceTable,
     /// standards mode (ISO 9613-2)
     iso: bool,
+    /// standards mode (CNOSSOS-EU)
+    cnossos: bool,
 }
 
 pub struct Scratch {
@@ -85,7 +90,8 @@ impl Engine {
         }
         let tab = ImpedanceTable::new(sigmas, &freqs);
         let iso = scene.settings.method == "iso9613";
-        Engine { scene, freqs, weights, partners, tab, iso }
+        let cnossos = scene.settings.method == "cnossos";
+        Engine { scene, freqs, weights, partners, tab, iso, cnossos }
     }
 
     pub fn compute(&self, x: f64, y: f64, height: f64, opts: Options, sc: &mut Scratch) -> PointResult {
@@ -117,7 +123,27 @@ impl Engine {
             let base = tree.z[n];
             let o = n * NH * NP * NB;
             let mut neutral = [[0.0; NB]; NH];
-            if self.iso {
+            if self.cnossos {
+                sc.p.build(s, &self.tab, (tree.x[n], tree.y[n], base + CNOSSOS_HS), (x, y, zr), None);
+                let (ah, af) = cnossos::attenuation(s, &sc.p);
+                let mut th = [0.0; NB];
+                let mut tf = [0.0; NB];
+                for b in 0..NB {
+                    th[b] = 10f64.powf(-ah[b] / 10.0);
+                    tf[b] = 10f64.powf(-af[b] / 10.0);
+                }
+                for p in 0..NP {
+                    let pf = s.settings.favourable_p[p].clamp(0.0, 1.0);
+                    for b in 0..NB {
+                        let mut pw = 0.0;
+                        for hi in 0..NH {
+                            pw += tree.pow[o + (hi * NP + p) * NB + b];
+                        }
+                        res.e[p][b] += pw * (pf * tf[b] + (1.0 - pf) * th[b]);
+                    }
+                }
+                neutral = [th; NH];
+            } else if self.iso {
                 let hs = s.settings.iso_source_height;
                 sc.p.build(s, &self.tab, (tree.x[n], tree.y[n], base + hs), (x, y, zr), None);
                 let ip = iso9613::attenuation(s, &sc.p);
@@ -254,7 +280,7 @@ impl Engine {
     }
 
     fn refl_source_height(&self) -> f64 {
-        if self.iso { self.scene.settings.iso_source_height } else { SOURCE_HEIGHTS[1] }
+        if self.iso { self.scene.settings.iso_source_height } else if self.cnossos { CNOSSOS_HS } else { SOURCE_HEIGHTS[1] }
     }
 
     fn occluded(&self, a: V3, b: V3, skip: &[usize]) -> bool {
@@ -280,6 +306,9 @@ impl Engine {
         let s = &self.scene;
         if self.iso {
             return self.add_reflected_iso(n, pts, refl, skip_barrier, sc, res);
+        }
+        if self.cnossos {
+            return self.add_reflected_cnossos(n, pts, refl, skip_barrier, sc, res);
         }
         let mut total = [1.0; NB];
         let mut len = 0.0;
@@ -342,6 +371,49 @@ impl Engine {
                     continue;
                 }
                 let t = refl[b] * 10f64.powf(-(adiv + s.alpha[b] * len + extra[b]) / 10.0) * f;
+                let mut pw = 0.0;
+                for hi in 0..NH {
+                    pw += s.src.pow[o + (hi * NP + p) * NB + b];
+                }
+                res.e[p][b] += pw * t;
+            }
+        }
+    }
+
+    /// CNOSSOS-EU image source: L_W + 10 lg(1 − α); the boundary attenuation
+    /// of the last leg in full, screening only of earlier legs; H and F.
+    fn add_reflected_cnossos(&self, n: usize, pts: &[V3], refl: [f64; NB], skip_barrier: Option<usize>, sc: &mut Scratch, res: &mut PointResult) {
+        let s = &self.scene;
+        let mut len = 0.0;
+        let mut eh = [0.0; NB];
+        let mut ef = [0.0; NB];
+        let legs = pts.len() - 1;
+        for (li, w) in pts.windows(2).enumerate() {
+            let l = w[0].dist(w[1]);
+            len += l;
+            sc.leg.build(s, &self.tab, (w[0].x, w[0].y, w[0].z), (w[1].x, w[1].y, w[1].z), skip_barrier);
+            let bh = cnossos::boundary(s, &sc.leg, cnossos::Cond::Homogeneous);
+            let bf = cnossos::boundary(s, &sc.leg, cnossos::Cond::Favourable);
+            for b in 0..NB {
+                if li == legs - 1 {
+                    eh[b] += bh[b];
+                    ef[b] += bf[b];
+                } else {
+                    eh[b] += bh[b].max(0.0);
+                    ef[b] += bf[b].max(0.0);
+                }
+            }
+        }
+        if len > s.settings.max_distance {
+            return;
+        }
+        let spread = 20.0 * len.max(1.0).log10() + 11.0;
+        let o = n * NH * NP * NB;
+        for p in 0..NP {
+            let pf = s.settings.favourable_p[p].clamp(0.0, 1.0);
+            for b in 0..NB {
+                let base = spread + s.alpha[b] * len;
+                let t = refl[b] * (pf * 10f64.powf(-(base + ef[b]) / 10.0) + (1.0 - pf) * 10f64.powf(-(base + eh[b]) / 10.0));
                 let mut pw = 0.0;
                 for hi in 0..NH {
                     pw += s.src.pow[o + (hi * NP + p) * NB + b];

@@ -2,7 +2,7 @@
 // loaded). Heavy work runs in workers (see runner.ts).
 
 import init, { barrier_preset } from '../wasm/sansim.js'
-import type { Barrier, Part, PresetParams, Project, Scenario } from '../model/types'
+import type { Barrier, Part, PresetParams, Project, Road, Scenario, Settings } from '../model/types'
 import type { Raster } from './raster'
 
 let ready: Promise<unknown> | undefined
@@ -29,12 +29,25 @@ function coreBarrier(b: Barrier) {
   return { id: b.id, name: b.name, points, profile, enabled: b.enabled }
 }
 
+/** Main roads: state and provincial roads (SS, LS). */
+export function isMainRoad(r: Road): boolean {
+  return r.cls === 'SS' || r.cls === 'LS'
+}
+
+/** Does this road emit under the calculation's source selection? */
+export function roadEmits(r: Road, set: Settings): boolean {
+  if (!r.enabled) return false
+  if (set.sources === 'main') return isMainRoad(r)
+  if (set.sources === 'selected') return set.selectedRoads.includes(r.id)
+  return true
+}
+
 /** The SceneInput JSON of core/src/scene.rs. */
 export function sceneJson(p: Project, s: Scenario, ground: Raster): string {
   const set = p.settings
   return JSON.stringify({
     ground: { cols: ground.cols, rows: ground.rows, cell: ground.cell, e0: ground.e0, n0: ground.n0 },
-    roads: p.roads.map((r) => ({ id: r.id, cls: r.cls, enabled: r.enabled, lines: r.lines, traffic: r.traffic })),
+    roads: p.roads.map((r) => ({ id: r.id, cls: r.cls, enabled: roadEmits(r, set), lines: r.lines, traffic: r.traffic })),
     measures: s.measures,
     buildings: p.buildings.map((b) => ({ id: b.id, ring: b.ring, height: b.height })),
     barriers: s.barriers.map(coreBarrier),
@@ -51,6 +64,7 @@ export function sceneJson(p: Project, s: Scenario, ground: Raster): string {
       humidity: set.humidity,
       method: set.method,
       cmetC0: set.cmetC0,
+      favourableP: set.favourableP,
       isoSourceHeight: set.isoSourceHeight,
     },
   })
