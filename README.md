@@ -93,8 +93,8 @@ octave, then band-averaged) and per **propagation condition**:
   building façade. Barrier faces are the extruded polygons of the actual
   cross-section, so a face tilted by θ reflects 2θ up or down; overhangs and
   bent tops block or redirect reflected rays (3D occlusion test). Energy
-  absorption per face and octave band (EN 1793-1 categories A3/A4 for
-  absorptive panels, grass, gabions, wood, concrete/glass, façades).
+  absorption per face and octave band (absorptive classes DLα ≈ 8 and ≈ 11 dB,
+  EN 1793-1 category A3, for panels, grass, gabions, wood, concrete/glass, façades).
 - **Refraction (weather)**: curved rays of radius R per class (default:
   homogeneous, favourable/downwind R = max(1000 m, 8 d) as in NMPB-2008,
   night inversion, upward refraction), using the curved-ground analogy for

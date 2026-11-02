@@ -50,9 +50,9 @@ fn yes() -> bool {
 pub fn absorption(material: &str) -> [f64; NB] {
     match material {
         "reflective" | "concrete" | "glass" => [0.01, 0.01, 0.02, 0.02, 0.03, 0.04, 0.05, 0.05],
-        // EN 1793-1 category A3 (DLα 8–11 dB)
+        // DLα ≈ 8 dB with the EN 1793-3 traffic spectrum: EN 1793-1 category A3, lower edge
         "absorptive" => [0.15, 0.30, 0.60, 0.85, 0.90, 0.85, 0.80, 0.75],
-        // A4 (DLα > 11 dB)
+        // DLα ≈ 11 dB: EN 1793-1 category A3, upper edge
         "highlyAbsorptive" => [0.20, 0.45, 0.80, 0.95, 0.97, 0.95, 0.90, 0.85],
         "grass" | "earth" => [0.10, 0.20, 0.40, 0.60, 0.70, 0.75, 0.80, 0.80],
         "gabion" | "stone" => [0.10, 0.20, 0.40, 0.60, 0.70, 0.70, 0.70, 0.70],
