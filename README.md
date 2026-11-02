@@ -32,7 +32,30 @@ South Tyrol (CC0), EPSG:25832:
 
 Traffic volumes start as **placeholders** — enter counted AADT, shares and speeds.
 
-## The model
+## Two calculation methods
+
+| | **Physical (detailed)** | **ISO 9613-2 (standards)** |
+|---|---|---|
+| Purpose | realistic comparison and explanation of options | formal assessments, reproducible by other software |
+| Sound over terrain, buildings, walls | complex Fresnel diffraction over the convex hull, ground images on both sides, phase kept | D_z = 10 lg(3 + 20/λ · C3 · z · K_met), multiple diffraction C3, caps 20/25 dB, A_bar = D_z − A_gr |
+| Around wall ends | Fresnel knife-edge on the end edge | ISO lateral path, K_met = 1 |
+| Ground | impedance + ground wave, Fresnel-zone weighted | general method, regions G_s/G_m/G_r from the ground map |
+| Reflections | image sources ≤ 2nd order on every face incl. tilted, energy absorption per band | image sources with ρ = 1 − α and the ISO size criterion |
+| Weather | curved-ray classes weighted by occurrence | downwind (C0 = 0) or long-term with C0 per period |
+| Turbulence | coherence loss + shadow scattering | not part of the standard |
+| Sections | rays + parabolic-equation wave solver | — |
+
+The chosen method is written on every result and into the CSV export.
+
+**Legal note.** ISO 9613-2 is the method generally accepted for project
+assessments (e.g. under DPR 142/2004). **Strategic noise maps** under the
+END (Directive 2002/49/EC, D.Lgs. 194/2005 and 42/2017) must use
+**CNOSSOS-EU**, whose propagation is NMPB-2008-based and *not* ISO 9613-2;
+the emission here is already CNOSSOS-EU, the CNOSSOS propagation is not yet
+implemented. Implemented edition: ISO 9613-2:1996 (the 2024 revision is not
+yet implemented). Have a formal report checked against certified software.
+
+## The model (physical method)
 
 ### Emission
 CNOSSOS-EU road traffic (Directive (EU) 2015/996): rolling + propulsion noise,
@@ -85,6 +108,16 @@ sound-speed profile (neutral, downwind, strong inversion, upwind), turbulence
 by random phase screens averaged over realisations. Shown as the pass-by level
 of one vehicle; independent of the ray model, so the two can be compared.
 
+### ISO 9613-2 (`core/src/iso9613.rs`)
+Octave-band general method on the same vertical profile: A_div, A_atm
+(ISO 9613-1), A_gr general method with heights above the mean ground plane
+and G per region from the ground map (porous below 1000 kPa·s/m²), top-edge
+screening by the convex hull of terrain, buildings and barrier sections with
+D_z (C2 = 20, C3, K_met, 20/25 dB caps, A_bar = D_z − A_gr ≥ 0), lateral paths
+(D_z with K_met = 1), image-source reflections with the size criterion of
+7.5, and C_met with C0 per period. Source height 0.05 m (CNOSSOS emission),
+adjustable.
+
 ### Validation (`core/tests`)
 - Faddeeva function and Fresnel integrals against mpmath reference values.
 - Knife-edge diffraction against ITU-R P.526 J(v) (±1 dB).
@@ -98,6 +131,9 @@ of one vehicle; independent of the ray model, so the two can be compared.
   removes that, absorptive panels too; a bent top screens more than a plain
   wall of the same height; every preset screens.
 - Downward refraction reduces a wall's insertion loss at 200 m.
+- ISO: D_z at z = 0 is 4.8 dB, caps 20/25 dB; size criterion; two distance
+  doublings of a line source; porous vs hard ground; wall insertion loss
+  bounded; reflective wall raises the opposite side; C_met ≤ C0.
 
 ## Known limits
 - Engineering approximations in the ray model: Deygout-type single hull
