@@ -15,7 +15,7 @@ fn traffic() -> Traffic {
 }
 
 fn wall(h: f64, front: &str) -> Barrier {
-    let p = PresetParams { kind: "vertical".into(), height: h, thickness: 0.2, angle: 0.0, top_length: 1.5, crest: 1.5, front_slope: 34.0, back_slope: 34.0, wall_height: 0.0, front: front.into(), back: front.into() };
+    let p = PresetParams { kind: "vertical".into(), height: h, thickness: 0.2, angle: 0.0, top_length: 1.5, crest: 1.5, front_slope: 34.0, back_slope: 34.0, wall_height: 0.0, crest_back: 0.0, front: front.into(), back: front.into() };
     Barrier { id: "w".into(), name: "w".into(), points: vec![[450.0, 105.0], [-50.0, 105.0]], profile: preset(&p), enabled: true }
 }
 

@@ -94,6 +94,11 @@ pub struct PresetParams {
     pub front_slope: f64,
     #[serde(default = "d_slope")]
     pub back_slope: f64,
+    /// berms: extra level top behind the crest (towards −o), m. A plateau
+    /// that runs back into rising terrain keeps the reference line at the
+    /// road-side edge, so the height is measured from the ground there.
+    #[serde(default)]
+    pub crest_back: f64,
     /// wall on a berm
     #[serde(default)]
     pub wall_height: f64,
@@ -202,14 +207,15 @@ pub fn preset(p: &PresetParams) -> Vec<Part> {
             };
             let mat = if p.kind == "gabion" { "gabion" } else { "grass" };
             let cw = p.crest.max(0.0);
+            let cb = p.crest_back.max(0.0);
             let fw = h / fs.to_radians().tan();
             let bw = h / bs.to_radians().tan();
             // road side is +o
             let verts = vec![
                 PV { o: cw / 2.0 + fw, h: 0.0, m: mat.into() },
                 PV { o: cw / 2.0, h, m: mat.into() },
-                PV { o: -cw / 2.0, h, m: mat.into() },
-                PV { o: -cw / 2.0 - bw, h: 0.0, m: "base".into() },
+                PV { o: -cw / 2.0 - cb, h, m: mat.into() },
+                PV { o: -cw / 2.0 - cb - bw, h: 0.0, m: "base".into() },
             ];
             let mut parts = vec![Part { verts }];
             if p.kind == "bermWall" && p.wall_height > 0.0 {

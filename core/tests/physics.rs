@@ -111,6 +111,7 @@ fn wall(kind: &str, height: f64, angle: f64, front: &str, y: f64) -> Barrier {
         front_slope: 34.0,
         back_slope: 34.0,
         wall_height: 0.0,
+        crest_back: 0.0,
         front: front.into(),
         back: front.into(),
     };

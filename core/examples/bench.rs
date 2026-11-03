@@ -36,7 +36,7 @@ fn main() {
         let (w, h) = (8.0 + rnd() * 10.0, 8.0 + rnd() * 10.0);
         buildings.push(Building { id: format!("b{i}"), ring: vec![[x, y], [x + w, y], [x + w, y + h], [x, y + h]], height: 6.0 + rnd() * 6.0 });
     }
-    let p = PresetParams { kind: "bentTop".into(), height: 3.0, thickness: 0.2, angle: 45.0, top_length: 1.5, crest: 1.5, front_slope: 34.0, back_slope: 34.0, wall_height: 0.0, front: "absorptive".into(), back: "absorptive".into() };
+    let p = PresetParams { kind: "bentTop".into(), height: 3.0, thickness: 0.2, angle: 45.0, top_length: 1.5, crest: 1.5, front_slope: 34.0, back_slope: 34.0, wall_height: 0.0, crest_back: 0.0, front: "absorptive".into(), back: "absorptive".into() };
     let barriers = vec![Barrier { id: "w".into(), name: "w".into(), points: vec![[1500.0, 1015.0], [900.0, 1007.0]], profile: preset(&p), enabled: true }];
     let input = SceneInput { ground: RasterMeta { cols, rows, cell: 2.5, e0: 0.0, n0: 0.0 }, roads, measures: Default::default(), buildings, barriers, settings: Settings::default() };
     let t0 = Instant::now();

@@ -114,6 +114,8 @@ export interface PresetParams {
   frontSlope: number
   backSlope: number
   wallHeight: number
+  /** berms: extra level top behind the crest, m */
+  crestBack?: number
   /** road side */
   front: Material
   back: Material

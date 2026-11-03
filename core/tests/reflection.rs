@@ -5,7 +5,7 @@ use sansim::engine::{Engine, Options, Scratch};
 use sansim::scene::*;
 
 fn wall(y: f64, north: bool, mat: &str) -> Barrier {
-    let p = PresetParams { kind: "vertical".into(), height: 4.0, thickness: 0.2, angle: 0.0, top_length: 1.5, crest: 1.5, front_slope: 34.0, back_slope: 34.0, wall_height: 0.0, front: mat.into(), back: mat.into() };
+    let p = PresetParams { kind: "vertical".into(), height: 4.0, thickness: 0.2, angle: 0.0, top_length: 1.5, crest: 1.5, front_slope: 34.0, back_slope: 34.0, wall_height: 0.0, crest_back: 0.0, front: mat.into(), back: mat.into() };
     let pts = if north { vec![[400.0, y], [0.0, y]] } else { vec![[0.0, y], [400.0, y]] };
     Barrier { id: format!("w{y}"), name: "w".into(), points: pts, profile: preset(&p), enabled: true }
 }

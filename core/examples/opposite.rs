@@ -18,7 +18,7 @@ fn traffic() -> Traffic {
 }
 
 fn wall(kind: &str, h: f64, angle: f64, mat: &str) -> Barrier {
-    let p = PresetParams { kind: kind.into(), height: h, thickness: 0.2, angle, top_length: 1.5, crest: 1.5, front_slope: 34.0, back_slope: 34.0, wall_height: 0.0, front: mat.into(), back: mat.into() };
+    let p = PresetParams { kind: kind.into(), height: h, thickness: 0.2, angle, top_length: 1.5, crest: 1.5, front_slope: 34.0, back_slope: 34.0, wall_height: 0.0, crest_back: 0.0, front: mat.into(), back: mat.into() };
     // drawn east → west so the road (south) is on the left = road side
     Barrier { id: "w".into(), name: kind.into(), points: vec![[700.0, 109.0], [-300.0, 109.0]], profile: preset(&p), enabled: true }
 }
